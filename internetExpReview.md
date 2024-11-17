@@ -1,6 +1,6 @@
 # 计算机网络实验复习
 
-![image-20241111155752695](C:\Users\lzfshy\AppData\Roaming\Typora\typora-user-images\image-20241111155752695.png)
+![image-20241117164134379](internetExpReview.assets/image-20241117164134379.png)
 
 ## 注意事项
 
@@ -11,7 +11,7 @@
 
    可用 tracert –d 10.1.3.10，避免DNS配置的干扰。
 
-2.undo vlan 1
+2.undo inter vlan 1
 
 这些出厂设置，会造成地址冲突、自动参加ospf的router id 选举，造成router id冲突等等。目前已发现其有可能会对**OSPF、BGP、组播、IPv6等实验造成不良影响，且故障隐蔽不易排查。**
 
@@ -36,6 +36,13 @@
    > dis inter brief
 
 4. 关掉XGE 1/0/25 to XGE1/0/28
+
+5. **ARP**
+
+   > [S1]undo mac-addr
+   > <S1> reset arp all
+   >
+   > PC:arp -d <!--若不成功管理员权限-->
 
 
 
@@ -411,6 +418,8 @@ arp -d
 
 重启
 
+若改变router id必须重启
+
 reset ospf process
 
 **查看邻居**
@@ -430,6 +439,13 @@ dis ospf rou
 **\# 查看Switch D的ABR/ASBR信息。**
 
 <SwitchD> display ospf abr-asbr
+
+> reset ospf all （用户视图）重新启动OSPF进程
+> display ospf peer 显示 OSPF 邻居信息
+> display ospf brief 显示 OSPF 的概要信息
+> display ospf error 显示 OSPF 错误信息
+> display ospf routing 显示 OSPF 路由表的信息
+> display ospf lsdb 显示 OSPF LSA 的信息
 
 ### exp 1 P180 图7-2 
 
@@ -991,8 +1007,290 @@ bgp 100
 address-family ipv4 unicast
 default  local-preference 150 
 
-**[R1]**
+**[R1]**2
 
 bgp 100
 address-family ipv4 unicast
 default med 10
+
+### IPV6 P327 
+
+#### 注意
+
+1. 查看ifindex的值
+   ipv6 if
+2. OSPFV3 router-id VS OSPF router id
+3. 手工指定VLAN接口1的全球单播地址，并允许其发布RA消息。（缺省情况下，所有的接口不会发布RA消息）
+4. 网关怎么配置
+
+#### 基础配置命令
+
+**在Ping链路本地地址时，需要使用-i参数来指定链路本地地址的接口。**
+
+1. PC配置IPV6地址
+   ipv6 adu ifindex/ipv6 address
+   ipv6 rtu prefix if index/gateway
+
+   > ipv6 adu 11/2001::2
+   >
+   > ipv6 rtu ::/0 11/2001::1
+   >
+   > <!--PC ping-->
+   >
+   > ping -6 2001::1
+   >
+   > netsh inter ipv6 show inter
+   
+2. 手工指定单播Ipv6地址
+
+   > **[S1]**
+   >
+   > sys 
+   > inter vlan 2
+   > ipv6 addr 3001::1/64
+   > undo ipv6 nd ra halt
+   > quit
+
+3. 配置静态
+
+   > 配置IPv6静态路由，该路由的目的地址为2001::/64，下一跳地址为3001::1。
+   > ipv6 route-static 2001:: 64 3001::1
+   >
+   > undo ipv6 route-static 2001::64
+
+4. netsh显示主机想要加入的组播组的消息
+
+   > netsh
+   > interface
+   > ipv6
+   > show join
+   >
+   > <!--查看获取了什么前缀-->
+   >
+   > show address
+   >
+   > <!--查看邻居地址-->
+   >
+   > show neighbors interface=5
+   > show destinationcache
+
+5. 查看ipv6 rou
+
+   > dis ipv6 rou
+   >
+   > ping ipv6 2001::1 
+   
+6. ospfv3 
+
+   v3 不需要network注入路由？进入端口划分area即可
+   
+   > ospfv3 1
+   > router-id 2.2.2.2
+   > inter G0/0
+   > ospfv3 1 area 0
+   > inter loop 1
+   > ospfv3 1 area 1
+   >
+   > <!--交换机-->
+   >
+   > inter vlan 100
+   > ospfv3 1 area 0
+   >
+   > <!--查看邻居-->
+   >
+   > dis ospfv3 peer
+   > dis ospfv3 rou
+   >
+   > dis ospfv3 lsdb 
+   > dis ospfv3 lsdb network
+   > dis ospfv3 lsdb router
+   > dis ospfv3 lsdb link
+   > dis ospfv3 lsdb intra-prefix
+
+#### IPV6 基础组网 P353
+
+#### OSPF v3 P362
+
+#### BGP4+
+
+**[S1]**
+
+undo inter vlan 1
+vlan 2
+port G1/0/1
+vlan 3
+port G1/0/2
+inter vlan 2
+ipv6 addr 1::2/64
+inter vlan 3
+ipv6 addr 2::1/64
+
+bgp 300
+router-id 2.2.2.2
+peer 1::1/64 as-number 100
+peer 2::2/64 as-number 300
+address-family ipv6
+peer 1::1/64 enable
+peer 2::2/64 as-number
+
+peer 2::2/64 next-hop-local
+
+
+
+### IPV6 设计
+
+**[R1]**
+
+inter G0/1
+ipv6 addr 5::1/64
+
+ospfv3 1
+router-id 3.3.3.3
+inter G0/0
+ospfv3 1 area 0
+
+pre 越小优先级越高 默认是60
+
+**[S1]**
+
+undo ipv6 route-static 5:: 64 3::2
+undo ipv6 route-static 5:: 64 4::2
+undo ipv6 route-static 6:: 64 3::2
+undo ipv6 route-static 6:: 64 4::2
+
+ipv6 route-static 5:: 64 3::2
+ipv6 route-static 5:: 64 4::2
+ipv6 route-static 6:: 64 3::2
+ipv6 route-static 6:: 64 4::2
+
+ipv6 route-static 5:: 64 3::2 pre 150
+ipv6 route-static 5:: 64 4::2 pre 100
+ipv6 route-static 6:: 64 3::2 pre 150
+ipv6 route-static 6:: 64 4::2 pre 100
+
+**[R2]**
+
+ipv6 route-static 5:: 64 4::2 
+ipv6 route-static 6:: 64 4::2 
+ipv6 route-static 1:: 64 2::1
+
+**[R1]** 
+
+ipv6 route-static 6:: 64 5::2
+ipv6 route-static 1:: 64 2::1 pre 100
+ipv6 route-static 1:: 64 3::1 pre 150
+
+**[S2]**
+
+ipv6 route-static :: 0 5::1
+
+
+
+### 组播实验 P286
+
+#### 基本配置
+
+1. 激活组播
+
+   > multicast routing
+   > inter G0/1
+   > igmp enable
+
+2. 查看igmp
+
+   > dis igmp inter
+   > dis igmp group
+   >
+   > <!--查看Pimrou-->
+   > dis pim rou
+   >
+   > dis pim neighbor
+
+3. 配置pim-dm
+
+   > multicast routing
+   > inter vlan 2
+   > pim dm
+   > <!--为了能看到扩散剪枝，断言、否决等，禁用pim state-refresh-->
+   >
+   > undo pim state-refresh-capable
+   > inter G0/0
+   > pim dm
+
+4. 配置pim-sm
+
+   > multicast routing
+   > inter vlan 2
+   > pim sm
+   > <!--配饰bsr优先级--->
+   >
+   > c-bsr 10.3.1.2 hash-length 4
+   >
+   > c-rp 10.3.1.2 ??
+
+#### IGMP P 299 图10-14
+
+#### PIMDM P 307
+
+#### PIMSM P 318
+
+### TCP P 101
+
+#### TCP拥塞控制机制
+
+滑动窗口机制；零窗口探查机制；慢启动、拥塞避免、拥塞处理和超时重传机制；快重传和快恢复算法；糊涂窗口综合症和Nagle算法
+
+**拥塞控制四算法：慢启动、拥塞避免、快重传、快恢复**
+
+流量控制和拥塞控制两者切不可混淆，实际上，前者只是实现后者的一个技术实现途径而已。
+
+>  swnd <= MIN[cwnd,rwnd]
+
+**read文件中各字段的含义？**
+
+![image-20241117170244246](internetExpReview.assets/image-20241117170244246.png)
+
+![image-20241117170207691](internetExpReview.assets/image-20241117170207691.png)
+
+![image-20241117170228437](internetExpReview.assets/image-20241117170228437.png)
+
+![image-20241117171212468](internetExpReview.assets/image-20241117171212468.png)
+
+![image-20241117171447956](internetExpReview.assets/image-20241117171447956.png)
+
+**配置转发速率**
+
+**router**
+
+转发速率10Mbps，等待10s undo shutdown
+
+80Kbps，等待40s,undo shutdown
+
+> inter G0/0
+> qos lr outbound cir 10000
+
+
+
+> inter G0/1
+> qos lr outbound cir 80
+
+> undo qos lr outbound 
+
+拥塞控制发送完立马shutdown，不要让他发送完
+
+注意分析
+
+### SNMP P276
+
+snmp-agent
+snmp-agent sys-info version all
+snmp-agent community read public
+snmp-agent community write private
+snmp-agent trap enable
+snmp-agent target-host trap address udp-domain 192.168.2.10 params securityname public
+
+### NAT
+
+>nat address-group 1
+>address 192.168.5.152 192.168.5.154
+>nat outbound 2001 address-group 1
