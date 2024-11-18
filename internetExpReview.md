@@ -65,6 +65,12 @@
 > <h3c> reboot
 > <h3c> n
 > <h3c> y
+>
+> reset saved-configuration
+> reset arp all
+> reset ospf process
+> reset bgp all
+> reboot
 
 ### 2. dispay
 
@@ -77,6 +83,12 @@
 > <!--查看交换机的MAC地址表-->
 >
 > dis mac-addr 
+>
+> display ip routing-table
+> display ospf routing-table
+> display bgp routing-table ipv4
+> display pim routing-table
+> display ipv6 routing-table
 
 ### 3. 路由器基本配置
 
@@ -116,9 +128,16 @@
    > port link-type access/hybrid/trunk
    > undo port link-type
 
+4. **mac地址表**
+
+   > display mac-address 
+   > undo mac-address *# 交换机清空 MAC 地址表*
+
 ### 5. win配置电脑的ip地址
 
 >netsh interface ip set address name="本地连接" static 192.168.2.10 255.255.255.0 192.168.2.1 0 
+>
+>arp-d *# 计算机清空 ARP 缓存*
 
 ## 集线器、交换机、路由器
 
@@ -402,8 +421,6 @@ PC:
 
 arp -d
 
-
-
 #####  **交换机MAC地址表说明**
 
 以VLAN Trunk实验的交换机S1为例，显示其MAC地址表，通常里面有3部分MAC地址：
@@ -416,7 +433,121 @@ arp -d
 
 ## OSPF
 
-重启
+### 报文类型
+
+1. **Hello报文**：周期性发送，用来发现和维持OSPF邻居关系，以及进行DR（Designated Router，指定路由器）/BDR（Backup Designated Router，备份指定路由器）的选举。
+2. **DD**（Database Description，数据库描述）报文：描述了本地LSDB（Link State DataBase，链路状态数据库）中每一条LSA（Link State Advertisement，链路状态通告）的摘要信息，用于两台路由器进行数据库同步。
+3. **LSR**（Link State Request，链路状态请求）报文：向对方请求所需的LSA。两台路由器互相交换DD报文之后，得知对端的路由器有哪些LSA是本地的LSDB所缺少的，这时需要发送LSR报文向对方请求所需的LSA。
+4. **LSU**（Link State Update，链路状态更新）报文：向对方发送其所需要的LSA。
+5. **LSAck**（Link State Acknowledgment，链路状态确认）报文：用来对收到的LSA进行确认。
+
+### LSA类型
+
+1) **第一类 LSA : Router** 
+
+   描述本路由器运行OSPF的接口的连接状况、花费等信息。传递范围在所属区域内。（描述DRother到DR的连接） 
+
+2) **第二类 LSA : Network(Net)** 
+
+   DR 生成。描述网段内所有已经同其建立了邻接关系的路由器。传递范围在所属区域内。（描述网段内的路由器信息） 
+
+3) **第三类 LSA : Summary Network(SumNet)** 
+
+   ABR 生成。ABR 完成它所属区域中的区域内路由计算后，将本区 域内的每一条OSPF路由封装发送到相邻区域。传递范围是除了第三类 LSA生成的区域之外的其他区域。（描述网段内的OSPF路由信息） 
+
+4) **第四类 LSA : Asbr-Summary(SumASB)** 
+
+   ABR 生成。描述本区域内部到达 ASBR 的路由。传递范围为第四 LSA生成的区域之外的其他区域(描述到达ASBR的路由信息)
+
+5) **第五类 LSA : AS-External(ASE)**
+
+    ASBR 生成。描述道自治系统外部路由信息。传递范围为整个自治系统(除Stub区域)。
+
+​	**骨干区域**： 即 area 0，要求其他所有的区域必须和骨干区域相连，并且骨干区域 自身也必须是连通的。所有ABR将自身区域内路由信息收集完成后生成第三 类LSA统一发送给骨干区域，再通过骨干区域将这些信息转发给其他非骨干 区域。可以有效地避免产生区域间路由回环。
+
+### 路由器的类型
+
+1. **区域内路由器（Internal Router）**
+
+​	该类路由器的所有接口都属于同一个OSPF区域。
+
+2. **区域边界路由器ABR(Area Border Router)**
+
+   该类路由器可以同时属于两个以上的区域，但其中一个必须是骨干区域。ABR用来连接骨干区域和非骨干区域，它与骨干区域之间既可以是物理连接，也可以是逻辑上的连接。
+
+3. **骨干路由器（Backbone Router）**
+
+   该类路由器至少有一个接口属于骨干区域。因此，所有的ABR和位于Area0的内部路由器都是骨干路由器。
+
+4. **自治系统边界路由器ASBR(AS Boundary Router)**
+
+   与其他AS交换路由信息的路由器称为ASBR。ASBR并不一定位于AS的边界，它有可能是区域内路由器，也有可能是ABR。只要一台OSPF路由器引入了外部路由的信息，它就成为ASBR。
+
+![image-20241118174304163](internetExpReview.assets/image-20241118174304163.png)	在OSPF中，邻居（Neighbor）和邻接（Adjacency)是两个不同的概念。路由器启动后，会通过接口向外发送Hello报文，收到Hello报文的路由器会检查报文中所定义的参数，如果双方一致就会形成邻居关系。只有当双方成功交换DD报文，交换LSA并达到LSDB同步之后，才形成邻接关系。
+
+### DR/BDR选举过程
+
+​	DR/BDR是由同一网段中所有的路由器根据路由器优先级和Router ID通过Hello报文选举出来的，只有优先级大于0的路由器才具有选举资格。
+
+​	进行DR/BDR选举时每台路由器将自己选出的DR写入Hello报文中，发给网段上每台运行OSPF协议的路由器。当处于同一网段的两台路由器同时宣布自己是DR时，路由器优先级高者胜出。如果优先级相等，则Router ID大者胜出。
+
+**可靠**
+
+从Router重复主Router的seq,主Router seq+1表示ACK上一条DD
+
+### 报文交互过程
+
+![image-20241118193643774](internetExpReview.assets/image-20241118193643774.png)
+
+**需要注意的是：**
+
++ 只有在广播或NBMA网络中才会选举DR；在P2P或P2MP网络中不需要选举DR。
+
++ DR是某个网段中的概念，是针对路由器的接口而言的。某台路由器在一个接口上可能是DR，在另一个接口上有可能是BDR，或者是DR Other。
+
++ DR/BDR选举完毕后，即使网络中加入一台具有更高优先级的路由器，也不会重新进行选举，替换该网段中已经存在的DR/BDR成为新DR/BDR。DR并不一定就是路由器优先级最高的路由器接口；同理，BDR也并不一定就是路由器优先级次高的路由器接口。
+
+### 网络类型
+
+### OSPF的网络类型
+
+#### 根据链路层协议类型将网络分为下列四种类型：
+
++ **广播（Broadcast）类型：**当链路层协议是Ethernet、FDDI时，缺省情况下，OSPF认为网络类型是Broadcast。在该类型的网络中，通常以组播形式（OSPF路由器的预留IP组播地址是224.0.0.5；OSPF DR/BDR的预留IP组播地址是224.0.0.6）发送Hello报文、LSU报文和LSAck报文；以单播形式发送DD报文和LSR报文。
+
++  **NBMA（Non-Broadcast Multi-Access，非广播多路访问）类型：**当链路层协议是帧中继、ATM或X.25时，缺省情况下，OSPF认为网络类型是NBMA。在该类型的网络中，以单播形式发送协议报文。
+
++ **P2MP（Point-to-MultiPoint，点到多点）类型：**没有一种链路层协议会被缺省的认为是P2MP类型。P2MP必须是由其他的网络类型强制更改的，常用做法是将NBMA网络改为P2MP网络。在该类型的网络中，缺省情况下，以组播形式（224.0.0.5）发送协议报文。可以根据用户需要，以单播形式发送协议报文。
+
++ **P2P（Point-to-Point，点到点）类型：**当链路层协议是PPP、HDLC时，缺省情况下，OSPF认为网络类型是P2P。在该类型的网络中，以组播形式（224.0.0.5）发送协议报文。
+
+**NBMA与P2MP网络之间的区别如下：**
+
++ NBMA网络是全连通的；P2MP网络并不需要一定是全连通的。
+
++ NBMA网络中需要选举DR与BDR；P2MP网络中没有DR与BDR。
+
++ NBMA网络采用单播发送报文，需要手工配置邻居；P2MP网络采用组播方式发送报文，通过配置也可以采用单播发送报文。
+
+#### 将路由器周边的网络拓扑结构抽象为网络模型
+
+Stub net：末端，网络中无其他OSPF设备，只有PC
+
+PPP网络：点到点连接另一台OSPF路由器
+
+点到多点网络：通过一个网络（抽象成一点）连接多个OSPF路由器，但这些路由器彼此之间并非全连通
+
+全连接网络（Transnet）：N个路由器全连接，第二类LSA，选举DR,BDR
+
+### 状态机
+
+维护邻居的状态机而非自身的
+
+![image-20241118200344571](internetExpReview.assets/image-20241118200344571.png)
+
+### 基本配置命令
+
+**重启**
 
 若改变router id必须重启
 
@@ -432,9 +563,11 @@ dis ospf peer verbose
 
 dis ospf peer
 
-查看路由
+查看路由，**可以看到网络类型**
 
 dis ospf rou
+
+![image-20241118175335094](internetExpReview.assets/image-20241118175335094.png)
 
 **\# 查看Switch D的ABR/ASBR信息。**
 
@@ -446,6 +579,15 @@ dis ospf rou
 > display ospf error 显示 OSPF 错误信息
 > display ospf routing 显示 OSPF 路由表的信息
 > display ospf lsdb 显示 OSPF LSA 的信息
+>
+> router1类/network2类/summary3类/asbr4类/ase5类
+
+**调试**
+
+> debugging ospf event
+> terminal debugging
+>
+> 断开S1与S1,R1,R2的连线，根据DEBUG信息画出邻居状态转移图
 
 ### exp 1 P180 图7-2 
 
@@ -1139,6 +1281,17 @@ peer 2::2/64 next-hop-local
 
 ### IPV6 设计
 
+- OSPF路径的优先级高于静态路由（默认静态路由优先级为60，而OSPF为10）。
+- 当OSPF不可用时，静态路由会接管流量。
+
+------
+
+### 总结
+
+- 如果只使用静态路由，调整`preference`即可。
+- 如果只使用OSPF，调整`cost`即可。
+- 如果需要静态路由和OSPF混合备份，建议调整静态路由的优先级，同时确保OSPF路径的`cost`合适。
+
 **[R1]**
 
 inter G0/1
@@ -1181,8 +1334,6 @@ ipv6 route-static 1:: 64 2::1 pre 100
 ipv6 route-static 1:: 64 3::1 pre 150
 
 **[S2]**
-
-ipv6 route-static :: 0 5::1
 
 
 
@@ -1254,11 +1405,68 @@ ipv6 route-static :: 0 5::1
 
 ![image-20241117170228437](internetExpReview.assets/image-20241117170228437.png)
 
+##### 滑动窗口
+
 ![image-20241117171212468](internetExpReview.assets/image-20241117171212468.png)
+
+![image-20241118103220727](internetExpReview.assets/image-20241118103220727.png)
 
 ![image-20241117171447956](internetExpReview.assets/image-20241117171447956.png)
 
-**配置转发速率**
+---
+
+##### 零窗口探查
+
+窗口收缩一般不发生；窗口合拢发生在接收窗口持续减小期间；窗口张开发生在休眠结束后通告大窗口时
+
+当接收端接收缓存已满，将发送一个0窗口通告报文；发送方收到后，等待非0窗口通告报文；为防止因接收端的非0窗口通告报文丢失而产生死锁；采用坚持定时器，定期发送窗口探查报文**Keep-Alive**；维持TCP连接。接收端收到探查报文后的立即响应。
+
+每相邻两条窗口侦查报文Keep-Alive报文 时间差组成的数据序列的规律：成倍增加规律
+
+**休眠？**
+
+结合报文写出对应接收端休眠、窗口收缩、窗口合拢、窗口张开的开始报文序号，并描述窗口的变化
+
+---
+
+##### 慢启动、拥塞避免、拥塞处理和超时重传机制
+
+先慢启动指数级；
+到达ssthresh拥塞避免，每个RTT内增加1；
+超时ssthresh=max(cwnd/2，2\*MSS)，cwnd=1，超时表明有拥塞；
+正常传输后，一次处于慢启动、拥塞避免
+
+---
+
+**慢启动指数级原因**
+
+1. 最开始cwnd=1，发送方只发送一个mss大小的数据包，在一个rtt后，会收到一个ack，cwnd加一，cwnd=2
+
+2. 此时cwnd=2，则发送方要发送两个mss大小的数据包，发送方会收到两个ack，则cwnd会进行两次加一的操作，则也就是cwnd+2，则cwnd=4，也就是cwnd = cwnd * 2
+
+---
+
+##### 快重传和快恢复
+
+针对收到三个重复ACK报文后，立即重传重复ACK序号的那条DATA报文
+
+ 第三个重复的ACK到达时，收到三个重复确认，快恢复算法。
+
+ssthresh=max（cwnd/2，2\*MSS），
+
+cwnd=min[cwnd,已发送的报文数-已到达接收方但未正式确认的报文+重传的报文数+3]。
+
+RTT和RTO基本不变，因为往返时间的测量是根据ACK报文的到达情况来计算的，而此时网络并未进入真正的拥塞状态，只是偶尔报文传输出错，因此RTT的测量不受影响，从而RTO没有变化。
+
+---
+
+##### 糊涂窗口综合症和Nagle算法
+
+![image-20241118115740051](internetExpReview.assets/image-20241118115740051.png)
+
+nagle算法起作用时，发送方在连接建立开始发送数据时，立即按序发送缓存中的数据（必须不大于1\*MSS），后续数据的发送由数据是否足以填满发送缓存的一半或1个MSS长度决定，Nagle算法不被启用时，发送方有数据就发。
+
+##### **配置转发速率**
 
 **router**
 
