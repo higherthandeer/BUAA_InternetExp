@@ -281,7 +281,9 @@ IEEE802.3标准
 
 #### 1.PPP
 
-![image-20241111115751029](C:\Users\lzfshy\AppData\Roaming\Typora\typora-user-images\image-20241111115751029.png)
+LCP状态转移图
+
+![image-20241119131037051](internetExpReview.assets/image-20241119131037051.png)
 
 广域网中广泛使用的数据链路层协议
 
@@ -291,43 +293,49 @@ IEEE802.3标准
 
 ##### PPP
 
-R1-S1串接
+R1-R2串接
 
-**R1**
+**R1&R2**
+
 inter S1/0
 ip addr 192.0.0.1 24
 
 link-protocol ppp
 
+<!--配置完成后需要重新启动该接口使之生效-->
+
 shutdown
 undo shutdown
 
 ctrl+z
-<R1>debugging ppp all
+<R1>
+
+debugging ppp all
 terminal debugging
 
 **R2**
-inter S1/0
-ip addr 192.0.0.2 24
 
-inter S2/0
+inter Ser2/0
 shutdown
-inter S1/0
+inter Ser1/0
 shutdown
 undo shutdown
 
 ##### **PAP**
 
-**[R1]**
+![image-20241119131117431](internetExpReview.assets/image-20241119131117431.png)
+
+**[R1]主**
+
 local-user RTB class network
 service-type ppp
 password simple aaa
-inter S1/0
-ppp authentication pap
+inter Ser1/0
+ppp authentication-mode pap
 
-**[R2]**
+**[R2]从**
 
-inter S1/0
+inter Ser1/0
 ppp pap local-user RTB password simple aaa
 
 配置PPP后重新启动接口生效
@@ -338,15 +346,21 @@ inter S1/0
 shutdown
 undo shutdown
 
-<R1>debugging ppp pap all
+<R1>
+
+debugging ppp pap all
 terminal debugging
-[R1]inter S1/0
+[R1]inter Ser1/0
 shut down
 undo shutdown
 
+testping debugging
+
 ##### CHAP
 
-**[R1]**
+![image-20241119131201429](internetExpReview.assets/image-20241119131201429.png)
+
+**[R1]主用户名RTA**
 
 local-user RTB class network
 service-type ppp
@@ -355,7 +369,7 @@ inter S0/0
 ppp authentication-mode chap
 ppp chap user RTA
 
-**[R2]**
+**[R2]从用户名RTB**
 
 local-user RTA class network
 service-type ppp
