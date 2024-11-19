@@ -39,10 +39,10 @@
 
 5. **ARP**
 
-   > [S1]undo mac-addr
-   > <S1> reset arp all
+   > [S1]undo mac-addr  
+   > <S1> reset arp all    
    >
-   > PC:arp -d <!--若不成功管理员权限-->
+   > PC:arp -d   <!--若不成功管理员权限-->
 
 
 
@@ -60,17 +60,17 @@
 
 ### 1.  重启
 
-> <h3c> reset sa
-> <h3c> y
-> <h3c> reboot
-> <h3c> n
+> <h3c> reset sa  
+> <h3c> y  
+> <h3c> reboot  
+> <h3c> n  
 > <h3c> y
 >
-> reset saved-configuration
-> reset arp all
-> reset ospf process
-> reset bgp all
-> reboot
+> reset saved-configuration  
+> reset arp all  
+> reset ospf process  
+> reset bgp all  
+> reboot   
 
 ### 2. dispay
 
@@ -84,17 +84,17 @@
 >
 > dis mac-addr 
 >
-> display ip routing-table
-> display ospf routing-table
-> display bgp routing-table ipv4
-> display pim routing-table
-> display ipv6 routing-table
+> display ip routing-table  
+> display ospf routing-table  
+> display bgp routing-table ipv4  
+> display pim routing-table  
+> display ipv6 routing-table   
 
 ### 3. 路由器基本配置
 
 1. **基本配置**
 
-   > <h3c>sys
+   > <h3c>sys  
    > [h3c]dis version
 
 2. **接口配置**
@@ -113,24 +113,24 @@
 
 1. **进入以太网端口**
 
-   > sys
+   > sys  
    > inter G1/0/1
 
 2. **打开关闭以太网端口**
 
-   > shutdown
+   > shutdown  
    > undo shutdown
 
 3. **设置以太网端口类型**
 
    端口视图下，默认access。
 
-   > port link-type access/hybrid/trunk
+   > port link-type access/hybrid/trunk  
    > undo port link-type
 
 4. **mac地址表**
 
-   > display mac-address 
+   > display mac-address   
    > undo mac-address *# 交换机清空 MAC 地址表*
 
 ### 5. win配置电脑的ip地址
@@ -170,8 +170,8 @@ IEEE802.1Q协议规定VLAN技术，在原有标准以太网帧格式中添加一
 
 2. **向当前VLAN添加/删除端口**
 
-   > vlan 2
-   > port G1/0/2 G1/0/1
+   > vlan 2  
+   > port G1/0/2 G1/0/1  
    > port G1/0/3 to G1/0/20
 
 3. **指定端口类型**
@@ -603,6 +603,17 @@ dis ospf rou
 >
 > 断开S1与S1,R1,R2的连线，根据DEBUG信息画出邻居状态转移图
 
+**引入**
+
+> [R1-OSPF-1]
+>
+> import route direct  
+> import route-static
+>
+> <!---引入默认路由-->
+>
+> route-default-advertise cost 100
+
 ### exp 1 P180 图7-2 
 
 **[R1]**
@@ -948,7 +959,51 @@ ospf cost 200
 
 ## BGP P 230
 
-### exp 1 BGP的i基本分析 图8-5 P236
+### BGP的报文类型
+
+1. **Open**：BGP对等体之间通过发送OPEN交换版本，AS号、保持时间、BGP 标识符等信息进行协商。 
+2. **KeepAlive**：BGP 对等体间周期性发送，以确保连接有效。
+3. **Update**：携带路由更新信息，包括撤销路由信息和可达路由信息及其路径属性。
+4. **Notification**：BGP 检测到差错时关闭同对等体的连接。
+
+![image-20241119211336162](internetExpReview.assets/image-20241119211336162.png)
+
+### BGP路由发布规则
+
+BGP发布路由时采用如下策略：
+
+1. 存在多条有效路由时，BGP发言者只将最优路由发布给对等体。如果配置了advertise-rib-active命令，则BGP发布IP路由表中的最优路由；否则，发布BGP路由表中的最优路由。
+
+2. BGP发言者只把自己使用的路由发布给对等体。
+3. BGP发言者会将从EBGP获得的路由发布给它的所有BGP对等体（包括EBGP对等体和IBGP对等体）。
+4. BGP发言者会将从IBGP获得的路由发布给它的EBGP对等体，但不会发布给它的IBGP对等体。
+5. 会话一旦建立，BGP发言者将把满足上述条件的所有BGP路由发布给新对等体。之后，BGP发言者只在路由变化时，向对等体发布更新的路由
+
+### BGP状态机
+
+![image-20241119230131592](internetExpReview.assets/image-20241119230131592.png)
+
+### 基本配置
+
+1. **组网配置，不要忘了addr family ipv4**
+
+   > bgp 300  
+   > peer 1.1.1.1 as-number 100  
+   > peer 3.1.1.2 as-number 300  
+   > address-family ipv4  
+   > peer 1.1.1.1 enable  
+   > peer 3.1.1.2 enable  
+   > peer 3.1.1.2 next-hop-local
+
+2. **debug**
+
+   > <R1>debugging bgp event  
+   >  <R1>terminal debugging  
+   >  <R1>reset bgp all
+
+3. **reset bgp all**
+
+### exp 1 BGP的基本分析 图8-5 P236
 
 **[R1]**
 undo inter vlan 1
@@ -1169,7 +1224,7 @@ bgp 100
 address-family ipv4 unicast
 default med 10
 
-### IPV6 P327 
+## IPV6 P327 
 
 #### 注意
 
@@ -1216,9 +1271,16 @@ default med 10
 
 4. netsh显示主机想要加入的组播组的消息
 
-   > netsh
-   > interface
-   > ipv6
+   > netsh  
+   > interface  
+   > ipv6 
+   >
+   > <!--查看本地接口-->
+   >
+   > show interface
+   >
+   > <!--查看主机想要计入的组播组信息-->
+   >
    > show join
    >
    > <!--查看获取了什么前缀-->
@@ -1373,25 +1435,35 @@ ipv6 route-static 1:: 64 3::1 pre 150
 
 3. 配置pim-dm
 
-   > multicast routing
-   > inter vlan 2
-   > pim dm
+   > multicast routing  
+   > inter vlan 2  
+   > pim dm  
    > <!--为了能看到扩散剪枝，断言、否决等，禁用pim state-refresh-->
    >
-   > undo pim state-refresh-capable
-   > inter G0/0
+   > undo pim state-refresh-capable  
+   > inter G0/0  
    > pim dm
 
 4. 配置pim-sm
 
-   > multicast routing
-   > inter vlan 2
-   > pim sm
+   > multicast routing  
+   > inter vlan 2  
+   > pim sm  
    > <!--配饰bsr优先级--->
    >
-   > c-bsr 10.3.1.2 hash-length 4
+   > c-bsr 10.3.1.2 hash-length 4  
    >
-   > c-rp 10.3.1.2 ??
+   > c-rp 10.3.1.2 ?? 
+
+5. 查看PC机想加入的组播组以及IP门票快接受列表和数据链路层的接受列表
+
+   > <!--显示计算机加入的多播组-->
+   >
+   > netsh interface ip show joins
+   >
+   > <!--IP-MAC表-->
+   >
+   > netsh interface ip show ipnet
 
 #### IGMP P 299 图10-14
 
@@ -1488,12 +1560,12 @@ nagle算法起作用时，发送方在连接建立开始发送数据时，立即
 
 80Kbps，等待40s,undo shutdown
 
-> inter G0/0
+> inter G0/0  
 > qos lr outbound cir 10000
 
 
 
-> inter G0/1
+> inter G0/1  
 > qos lr outbound cir 80
 
 > undo qos lr outbound 
@@ -1513,6 +1585,7 @@ snmp-agent target-host trap address udp-domain 192.168.2.10 params securityname 
 
 ### NAT
 
->nat address-group 1
->address 192.168.5.152 192.168.5.154
+>nat address-group 1  
+>address 192.168.5.152 192.168.5.154  
+>int G0/1  
 >nat outbound 2001 address-group 1
