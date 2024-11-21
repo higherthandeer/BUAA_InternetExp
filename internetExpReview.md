@@ -1224,9 +1224,64 @@ bgp 100
 address-family ipv4 unicast
 default med 10
 
-## IPV6 P327 
+## IPV6 P327
+
+###  ICMPV6
+
+两类：差错报文，信息报文
+
+#### 差错报文
+
+#### 信息报文
+
+#### 邻居发现协议（ND）
+
+RS和RA用于路由器发现和前缀发现，而NS和NA用于地址解析。
+
+**RS(Router Solicitation,路由器请求报文 )**：
+
+​	主机发出，希望路由器回复路由信息。 Hop limit为 255，防 止有别的链路的RS来欺骗。ICMPv6 options包含发送者的MAC地 址。目的地址是FF02::2
+
+ **RA(Router Advertisement,路由器通告报文):** 
+
+对 RS 报文的回复信息。路由器选项包括路由器的MAC地址、MTU、前缀信息等。目的地址是FF02::1。 
+
+Cur Hop Limit必须为255，接收节点只认为跳数限制是255的RA是有效的，
+
+**NS(Neighbor Solicitation,邻居请求报文):** 
+
+用于解析邻居的MAC地址 && 重复地址检测(IP报文中源地址为 0地址，并且ICMPv6中无选项字段) 
+
+**NA(Router Advertisement,邻居公告报文):** 
+
+R:路由器标记(1路由器 0主机) ,表示报文发送者的角色
+
+S:请求标记（1对NS报文的响应 0主动发出的） 
+
+O:覆盖标记（1可用NA中目标MAC地址覆盖邻居缓存表 0只有在 不知道的时候可以使用更新邻居缓存表
+
+#### MLD组播侦听者发现协议：
+
+1. 路由器发出 组播侦听者查询报文 查询本地组播成员。 
+2. 主机发出 组播侦听者报告报文 宣告自己加入的组播组。 
+3. 路由器接收到 报告报文后 添加相关表项。 
+4. 主机离开组播组时 发出 组播侦听者完成报文。 需要路由器进行处理，所以设置了 Hop-by-hop选项头，让路由器 来进行处理。 Hop limit为1，以使MLD报文限制在链路本地上。
+
+### OSPFV3
+
+#### LSA类型
+
+1.  Router LSA（Type-1）：由每个路由器生成，描述本路由器的链路状态和开销，只在路由器所处区域内传播。
+2. Network LSA（Type-2）：由广播网络和NBMA（Non-Broadcast Multi-Access，非广播多路访问）网络的DR（Designated Router，指定路由器）生成，描述本网段接口的链路状态，只在DR所处区域内传播。
+3. Inter-Area-Prefix LSA（Type-3）：由ABR（Area Border Router，区域边界路由器）生成，在与该LSA相关的区域内传播，描述一条到达本自治系统内其他区域的IPv6地址前缀的路由，和OSPFV2Type3LSA相似。
+4.  Inter-Area-Router LSA（Type-4）：由ABR生成，在与该LSA相关的区域内传播，描述一条到达本自治系统内的ASBR（Autonomous System Boundary Router，自治系统边界路由器）的路由。
+5. AS External LSA（Type-5）：由ASBR生成，描述到达其它AS（Autonomous System，自治系统）的路由，传播到整个AS（Stub区域和NSSA区域除外）。缺省路由也可以用AS External LSA来描述。
+6. **Link LSA（Type-8）：**路由器为每一条链路生成一个Link-LSA，在本地链路范围内传播，描述该链路上所连接的IPv6地址前缀及路由器的Link-local地址。
+7. **Intra-Area-Prefix LSA（Type-9）**：包含路由器上的IPv6前缀信息，Stub区域信息或穿越区域（Transit Area）的网段信息，该LSA在区域内传播。由于Router LSA和Network LSA不再包含地址信息，导致了Intra-Area-Prefix LSA的引入。
 
 #### 注意
+
+ipv6没有广播地址，他的功能被组播地址代替
 
 1. 查看ifindex的值
    ipv6 if
@@ -1256,10 +1311,14 @@ default med 10
 
    > **[S1]**
    >
-   > sys 
-   > inter vlan 2
-   > ipv6 addr 3001::1/64
-   > undo ipv6 nd ra halt
+   > <!--检查-->
+   >
+   > dis ipv6 inter
+   >
+   > sys   
+   > inter vlan 2  
+   > ipv6 addr 3001::1/64  
+   > undo ipv6 nd ra halt  
    > quit
 
 3. 配置静态
@@ -1289,7 +1348,7 @@ default med 10
    >
    > <!--查看邻居地址-->
    >
-   > show neighbors interface=5
+   > show neighbors interface=5  
    > show destinationcache
 
 5. 查看ipv6 rou
@@ -1413,15 +1472,105 @@ ipv6 route-static 1:: 64 3::1 pre 150
 
 
 
-### 组播实验 P286
+## 组播实验 P286
 
-#### 基本配置
+### IGMP
+
+1. 主要包含两种类型：  
+   成员查询消息（Quey Message）  
+   成员关系报告（Report Message）
+
+2. 查询器的选举，选IP地址最小的路由器
+
+### PIM-DM
+
+**推模式，有源树=最短路径树SPT**
+
+#### 机制与报文
+
+##### 报文类型
+
+Hello、Registe、Register-Stop、Join/Prune、Bootstrap、Assert、Graft、Graft-ack、Candidate-RP-Adervertisenment
+
+**单播**
+
+Registe、Register-Stop、Graft、Graft-ack
+
+其余都组播发送目的地址224.0.0.13
+
+**邻居发现维护Hello**
+
+**剪枝Prune，剪枝否决发送Join报文**
+
+**嫁接Graft：被剪枝的节点上出现了组播组成员**
+
+**断言Assert：相同的组播报文被两台组播路由器重复发送，两台路由器发送Assert报文选举出组播转发者**
+
+(1)   到组播源的优先级较高者获胜；
+
+(2)   如果到组播源的优先级相等，那么到组播源的度量值较小者获胜；
+
+(3)   如果到组播源的度量值也相等，则下游接口IP地址较大者获胜。
+
+### PIM-SM
+
+​	**拉模式**，构造并维护RPT（共享树或汇集树），RPT选择PIM域中某台路由器作为公用的根节点RP（汇集点），组播数据同股票RP沿着RPT转发给i接收者。
+
+​	无论是与组播源相连的网络，还是与接收者相连的网络，都需要选举DR（Designated Router，指定路由器）。接收者侧的DR负责向RP发送加入报文（Join Message）；组播源侧的DR负责向RP发送注册报文（Register Message）。
+
+​	连接接收者的路由器向**某组播组对应的RP**发送加入报文（Join），该报文被逐跳送达RP，所经过的路径就形成了RPT的分支。
+
+​	组播源如果要想某组播组发送组播数据，首先由组播源测DR负责向RP注册，把注册报文（Register）通过单播方式发送给RP，该报文到达RP后出发建立最短路径书SPT。之后组播源把组播数据沿着SPT法相RP，而后RP沿着共享树RPT发给接收者。
+
+​	**HELLO报文选举DR，首先最高优先级，其次IP地址最大成为DR**
+
+#### RP的选举
+
+​	RP，C-RP（候选RP）不同的RP服务于不同的组播组，需要配置BSR（Bootstrap自举路由器），**一个PIMSM只有一个BSR**，但可有多个C-BSR。
+
+​	**BSR**负责收集C-RP发送的通告报文（Candidate-RP-Advertisement Message）汇总并封装到自举报文（BootStrap Message）中并发布到整个PIM-SM。
+
+​	**网络中各路由器根据此选出自己组播组的RP**。
+
+(1)   首先比较C-RP所服务的组范围，所服务的组范围较小者获胜。
+
+(2)   若服务的组范围相同，再比较C-RP的优先级，优先级较高者获胜。
+
+(3)   若优先级也相同，再使用哈希（Hash）函数计算哈希值，哈希值较大者获胜。
+
+(4)   若哈希值也相同，则C-RP的IP地址较大者获胜。
+
+#### RPT的构建
+
+(1)   首先比较C-RP所服务的组范围，所服务的组范围较小者获胜。
+
+(2)   若服务的组范围相同，再比较C-RP的优先级，优先级较高者获胜。
+
+(3)   若优先级也相同，再使用哈希（Hash）函数计算哈希值，哈希值较大者获胜。
+
+(4)   若哈希值也相同，则C-RP的IP地址较大者获胜。
+
+#### RPT向SPT切换
+
+​	接受测的DR发现从RP发往组播组G的组播数据速率超过一定的阈值，则发起切换。
+
+​	首先，接收者侧DR向组播源方向发送（S，G）加入报文，沿途经过的所有路由器在其转发表中都生成了（S，G）表项，从而建立了SPT分支；
+
++ 随后，当组播数据沿SPT到达RPT与SPT分叉的路由器时，该路由器开始丢弃沿RPT到达的组播数据，同时向RP逐跳发送含RP位的剪枝报文，RP收到该报文后继续向组播源方向发送剪枝报文（假设此时只有这一个接收者），从而完成了SPT切换；
+
++  最终，组播数据将沿SPT从组播源到达到接收者。
+
+通过SPT切换，PIM-SM能够以比PIM-DM更经济的方式建立SPT。
+
+### 基本配置
 
 1. 激活组播
 
    > multicast routing
    > inter G0/1
    > igmp enable
+
+   位于网络边缘直接与组播接收者或者与终端主机相连的组播路由器igmp enable即可
 
 2. 查看igmp
 
@@ -1432,6 +1581,10 @@ ipv6 route-static 1:: 64 3::1 pre 150
    > dis pim rou
    >
    > dis pim neighbor
+   >
+   > <!--查看PIM被剪枝的路由-->
+   >
+   > dis pim rou fsm
 
 3. 配置pim-dm
 
@@ -1454,6 +1607,26 @@ ipv6 route-static 1:: 64 3::1 pre 150
    > c-bsr 10.3.1.2 hash-length 4  
    >
    > c-rp 10.3.1.2 ?? 
+   >
+   > <!--注意在边缘路由器上配置igmp enable-->
+   >
+   > dis pim rou
+   >
+   > 可以看到RP以及能够画出RPT树以及SPT树
+   >
+   > <!--禁止SPT树的创建-->
+   >
+   > [R2]pim
+   >
+   > [R2-pim]spt-switch-threshold infinity
+   >
+   > 停止所有组播发送和接受，直至S1的组播路由表清空。所有主机运行Wireshark软件，进行报文截获。然后打开R1debug开关输入
+   >
+   > <r1>debugging pim join-prune
+   >
+   > <r1>terminal debugging
+   >
+   > [R2-PIM]undo spt-switch-threshold infinity
 
 5. 查看PC机想加入的组播组以及IP门票快接受列表和数据链路层的接受列表
 
@@ -1576,16 +1749,1143 @@ nagle算法起作用时，发送方在连接建立开始发送数据时，立即
 
 ### SNMP P276
 
-snmp-agent
-snmp-agent sys-info version all
-snmp-agent community read public
-snmp-agent community write private
-snmp-agent trap enable
+snmp-agent  
+snmp-agent sys-info version all  
+snmp-agent community read public  
+snmp-agent community write private  
+snmp-agent trap enable  
 snmp-agent target-host trap address udp-domain 192.168.2.10 params securityname public
 
 ### NAT
 
+>acl basic 2001  
+>rule permit source 10.0.0.0 0.255.255.255  
+>rule deny source any
+>
+>qu
+>
 >nat address-group 1  
 >address 192.168.5.152 192.168.5.154  
 >int G0/1  
 >nat outbound 2001 address-group 1
+>
+><!--记得给出口路由器配置默认路由并引入-->
+>
+>ip route-static 0.0.0.0 0 192.168.5.1
+>
+>default-route-advertisement cost 100
+
+
+
+### 卷3TCP
+
+netsh interface ip set addr name="本地连接" static 192.168.1.2 255.255.255.0 192.168.1.1 0
+
+netsh interface ip set addr name="本地连接" static 192.168.2.2 255.255.255.0 192.168.2.1 0
+
+**S1**
+
+sys 
+sysname S1
+vlan 2
+port E1/0/20 to E1/0/24
+int vlan 1
+ip addr 192.168.5.2 24
+int vlan 2
+ip addr 192.168.1.1 24
+
+ospf 
+area 0
+network 192.168.5.0 0.0.0.255
+
+qu
+
+qu
+
+ip route-static 192.168.4.0 24 192.168.5.1
+ip route-static 192.168.2.0 24 192.168.5.1
+
+**R1**
+
+sys
+sysname R1
+int E0/0
+undo ip addr 
+ip addr 192.168.5.1 24
+int S1/0
+ip addr 192.168.3.1 24
+ospf
+area 0
+network 192.168.3.0 0.0.0.255
+network 192.168.5.0 0.0.0.255
+
+qu
+
+qu
+
+ip route-static 192.168.1.0 24 192.168.5.2
+
+ip route-static 192.168.4.0 24 192.168.3.2
+ip route-static 192.168.2.0 24 192.168.3.2
+
+**R2**
+
+int E0/0
+undo ip addr
+
+ip addr 192.168.4.1 24
+int S1/0
+IP ADDR 192.168.3.2 24
+OSPF
+area 0
+
+network 192.168.3.0 0.0.0.255
+network 192.168.4.0 0.0.0.255
+
+qu
+
+qu
+
+ip route-static 192.168.1.0 24 192.168.3.1
+
+ip route-static 192.168.2.0 24 192.168.4.2
+
+**S2**
+
+vlan 2
+port E1/0/20 to E1/0/24
+
+int vlan 1
+ip addr 192.168.4.2 24
+int vlan 2
+ip addr 192.168.2.1 24
+
+ip route-static 0.0.0.0 0 192.168.4.1
+
+### 卷4TCP
+
+netsh interface ip set addr name="本地连接" static 192.168.1.2 255.255.255.0 192.168.1.1 0
+
+netsh interface ip set addr name="本地连接" static 192.168.2.2 255.255.255.0 192.168.2.1 0
+
+**S1**
+
+sys 
+sysname S1
+vlan 2
+port E1/0/20 to E1/0/24
+int vlan 1
+ip addr 192.168.5.2 24
+int vlan 2
+ip addr 192.168.1.1 24
+
+ospf 
+area 0
+network 192.168.5.0 0.0.0.255
+network 192.168.1.0 0.0.0.255
+
+qu
+
+qu
+
+**R1**
+
+sys
+sysname R1
+int E0/0
+undo ip addr 
+ip addr 192.168.1.10 24
+int S1/0
+ip addr 192.168.3.2 24
+
+int E0/1
+ip addr 192.168.4.1 24
+
+ospf
+area 0
+network 192.168.1.0 0.0.0.255
+network 192.168.3.0 0.0.0.255
+
+area 1
+network 192.168.4.0 0.0.0.255
+
+**R2**
+
+int E0/0
+undo ip addr
+
+ip addr 192.168.5.1 24
+int S1/0
+IP ADDR 192.168.3.1 24
+OSPF
+area 0
+
+network 192.168.3.0 0.0.0.255
+network 192.168.5.0 0.0.0.255
+
+qu
+
+qu
+
+**S2**
+
+vlan 2
+port E1/0/20 to E1/0/24
+
+int vlan 1
+ip addr 192.168.4.2 24
+int vlan 2
+ip addr 192.168.2.1 24
+
+OSPF
+area 1
+
+network 192.168.4.0 0.0.0.255
+network 192.168.2.0 0.0.0.255
+
+
+
+### 卷7卷15TCP
+
+netsh interface ip set addr name="本地连接" static 192.168.1.2 255.255.255.0 192.168.1.1 0
+
+netsh interface ip set addr name="本地连接" static 192.168.2.2 255.255.255.0 192.168.2.1 0
+
+**S1**
+
+sys 
+sysname S1
+vlan 2
+port E1/0/20 to E1/0/24
+int vlan 1
+ip addr 192.168.5.2 24
+int vlan 2
+ip addr 192.168.1.1 24
+
+ospf 
+area 0
+network 192.168.5.0 0.0.0.255
+network 192.168.1.0 0.0.0.255
+
+ip route-static 192.168.4.0 24 192.168.1.10
+ip route-static 192.168.4.0 24 192.168.5.1
+
+ip route-static 192.168.2.0 24 192.168.1.10
+ip route-static 192.168.2.0 24 192.168.5.1
+
+qu
+
+qu
+
+**R1**
+
+sys
+sysname R1
+int E0/0
+undo ip addr 
+ip addr 192.168.1.10 24
+int S1/0
+ip addr 192.168.3.2 24
+
+int E0/1
+ip addr 192.168.4.1 24
+
+ospf
+area 0
+network 192.168.1.0 0.0.0.255
+network 192.168.3.0 0.0.0.255
+
+qu
+qu
+
+ip route-static 192.168.2.0 24 192.168.4.2
+
+**R2**
+
+int E0/0
+undo ip addr
+
+ip addr 192.168.5.1 24
+int S1/0
+IP ADDR 192.168.3.1 24
+OSPF
+area 0
+
+network 192.168.3.0 0.0.0.255
+network 192.168.5.0 0.0.0.255
+
+ip route-static 192.168.4.0 24 192.168.3.2
+
+ip route-static 192.168.2.0 24 192.168.3.2
+
+ip route-static 192.168.1.0 24 192.168.5.2
+
+qu
+
+qu
+
+**S2**
+
+vlan 2
+port E1/0/20 to E1/0/24
+
+int vlan 1
+ip addr 192.168.4.2 24
+int vlan 2
+ip addr 192.168.2.1 24
+
+ip route-static 0.0.0.0 0 192.168.4.1
+
+
+
+### 卷10 TCP
+
+netsh interface ip set addr name="本地连接" static 192.168.1.2 255.255.255.0 192.168.1.1 0
+
+netsh interface ip set addr name="本地连接" static 192.168.2.2 255.255.255.0 192.168.2.1 0
+
+**S1**
+
+sys 
+sysname S1
+vlan 2
+port  E1/0/23
+
+vlan 3
+port  E1/0/2
+
+vlan 4
+port  E1/0/24
+
+int vlan 1
+ip addr 192.168.3.2 24
+int vlan 2
+ip addr 192.168.1.1 24
+int vlan 3
+ip addr 192.168.4.2 24
+int vlan 4
+ip addr 192.168.2.1 24
+
+ospf 
+area 0
+network 192.168.1.0 0.0.0.255
+network 192.168.2.0 0.0.0.255
+network 192.168.3.0 0.0.0.255
+network 192.168.4.0 0.0.0.255
+
+int vlan 1
+ospf cost 100
+int vlan 3
+ospf cost 200
+
+qu
+
+ip ttl enable
+ip unreachables ena
+
+**R1**
+
+sys
+sysname R1
+int E0/1
+undo ip addr 
+ip addr 192.168.3.1 24
+int S1/0
+ip addr 192.168.0.1 24
+
+int E0/0
+ip addr 202.112.1.1 24
+
+ospf
+area 0
+network 192.168.0.0 0.0.0.255
+network 192.168.3.0 0.0.0.255
+
+int S1/0
+ospf cost 200
+int E0/1
+ospf cost 100
+
+qu
+
+ip route-static 211.100.2.0 24 202.112.1.2 
+ospf 
+import direct cost 100
+import-route static cost 100
+
+qu
+
+ip ttl enable
+ip unreachables ena
+
+**R2**
+
+int E0/0
+undo ip addr
+
+ip addr 202.112.2.1 24
+int S1/0
+IP ADDR 192.168.0.2 24
+
+int E0/1
+ip addr 192.168.4.1 24
+
+OSPF
+area 0
+
+network 192.168.0.0 0.0.0.255
+network 192.168.4.0 0.0.0.255
+
+ip route-static 211.100.2.1 24 202.112.2.1
+
+ospf 
+import direct cost 200
+import-route static cost 200
+
+qu
+
+ip ttl enable
+ip unreachables ena
+
+**S2**
+
+vlan 2
+port E1/0/1
+vlan 3
+port E1/0/2
+
+int loop 1
+ip addr 211.100.2.1 24
+int vlan 2
+ip addr 202.112.1.2 24
+int vlan 3
+ip addr 202.112.2.2 24
+
+ip route-static 192.168.0.0 24 202.112.1.1 pre 10
+
+ip route-static 192.168.0.0 24 202.112.2.1 pre 60
+
+ip ttl enable
+ip unreachables ena
+
+### 卷20 IPV6 WIN
+
+PC 
+ipv6 install
+ipv6 adu
+
+**S1**
+
+sys
+
+sysname S1
+undo inter vlan 1
+vlan 2 
+port E1/0/1
+vlan 3
+port E1/0/24
+qu
+ipv6
+int vlan 2
+ipv6 addr 2001::1/64
+int vlan 3
+ipv6 addr 2003::1/64
+
+ipv6 route-static :: 0 2003::2
+
+**R1**
+
+sys
+
+sysname R1
+
+ipv6
+int E0/0
+undo ip addr
+iipv6 addr 2003::2/64
+int E0/1
+ipv6 addr 2004::1/64
+
+ospfv3 1
+int E0/1
+ospf v3 1 area 0
+
+**S2**
+
+sys 
+
+sysname S2
+
+undo int vlan 1
+vlan 2
+port E1/0/1
+vlan 3
+port E1/0/24
+
+qu
+
+ipv6
+int vlan 2
+ipv6 addr 2004::2/64
+int vlan 3
+ipv6 addr 2007::1/64
+
+ospfv3 1
+
+int vlan 2
+ospfv3 1 area 0
+int vlan 3
+ospfv3 1 area 0
+
+qu
+
+ipv6 route-static 2003:: 64 2004::1
+ipv6 route-static 2001:: 64 2004::1
+
+### 卷24 IPV6 WIN
+
+PC 
+ipv6 install
+ipv6 adu
+
+**S1**
+
+sys
+
+sysname S1
+undo inter vlan 1
+vlan 2 
+port E1/0/1
+vlan 3
+port E1/0/24
+qu
+ipv6
+int vlan 2
+ipv6 addr 2004::1/64
+int vlan 3
+ipv6 addr 2003::2/64
+
+ospfv3 1
+int vlan 2
+ospfv3 area 1
+int vlan 3
+ospfv3 area 1
+
+qu
+
+
+
+ipv6 route-static 2001:: 64 2003::1
+
+**R1**
+
+sys
+
+sysname R1
+
+ipv6
+int E0/0
+undo ip addr
+ipv6 addr 2003::1/64
+int E0/1
+ipv6 addr 2007::2/64
+
+int loop 1
+ipv6 addr 2005::1/128
+
+int loop 0
+ipv6 addr 2008::1/128
+
+ospfv3 1
+int E0/1
+ospfv3 1 area 1
+int loop 1
+ospfv3 1 area 1
+
+int E0/0
+ospfv3 1 area 0
+int loop 0
+ospfv3 1 area 0
+
+qu
+
+ipv6 route-static 2001:: 64 2007::1
+
+
+
+**S2**
+
+sys 
+
+sysname S2
+
+undo int vlan 1
+vlan 2
+port E1/0/1
+vlan 3
+port E1/0/24
+
+qu
+
+ipv6
+int vlan 2
+ipv6 addr 2001::1/64
+int vlan 3
+ipv6 addr 2007::1/64
+
+int loop 0
+ipv6 addr 2006::1/128
+
+ospfv3 1
+
+int loop 0
+ospfv3 1 area 0
+int vlan 3
+ospfv3 1 area 0
+
+qu
+
+
+
+### 卷21  WIN 
+
+netsh interface ip set addr name="本地连接" static 192.168.1.2 255.255.255.0 192.168.1.1 0
+
+netsh interface ip set addr name="本地连接" static 192.168.5.2 255.255.255.0 192.168.5.1 0
+
+**S1**
+
+sys 
+sysname S1
+vlan 2
+port E1/0/20 to E1/0/24
+int vlan 1
+ip addr 192.168.2.2 24
+int vlan 2
+ip addr 192.168.1.1 24
+
+ospf 
+area 0
+network 192.168.2.0 0.0.0.255
+network 192.168.1.0 0.0.0.255
+
+qu
+
+qu
+
+dis ip rou
+
+ip route-static 192.168.3.0 24 192.168.2.1
+ip route-static 192.168.4.0 24 192.168.2.1
+
+ip route-static 192.168.5.0 24 192.168.2.1
+
+ip ttl enable
+ip unreachables ena
+
+**R1**
+
+sys
+sysname R1
+int E0/0
+undo ip addr 
+ip addr 192.168.2.1 24
+int S1/0
+ip addr 192.168.3.1 24
+
+ospf
+area 0
+network 192.168.2.0 0.0.0.255
+
+qu
+qu
+
+ip route-static 192.168.4.0 24 192.168.3.2
+
+ip route-static 192.168.5.0 24 192.168.3.2
+
+ip ttl enable
+ip unreachables ena
+
+**R2**
+
+int E0/0
+undo ip addr
+
+ip addr 192.168.4.1 24
+int S1/0
+IP ADDR 192.168.3.2 24
+OSPF
+area 0
+
+network 192.168.4.0 0.0.0.255
+
+qu
+
+qu
+
+ip route-static 192.168.2.0 24 192.168.3.1
+
+ip route-static 192.168.1.0 24 192.168.3.1
+
+ip ttl enable
+ip unreachables ena
+
+
+
+**S2**
+
+vlan 2
+port E1/0/20 to E1/0/24
+
+int vlan 1
+ip addr 192.168.4.2 24
+int vlan 2
+ip addr 192.168.5.1 24
+
+ospf 
+area 0
+network 192.168.5.0 0.0.0.255
+network 192.168.4.0 0.0.0.255
+
+qu
+
+qu
+
+dis ip rou
+
+?ip route-static 0.0.0.0 0192.168.4.1
+
+ip route-static 192.168.3.0 24 192.168.4.1
+
+ip route-static 192.168.2.0 24 192.168.4.1
+
+ip route-static 192.168.1.0 24 192.168.4.1
+
+ip ttl enable
+ip unreachables ena
+
+### 卷13 23win
+
+netsh interface ip set addr name="本地连接" static 192.168.6.2 255.255.255.0 192.168.6.1 0
+
+netsh interface ip set addr name="本地连接" static 192.168.5.2 255.255.255.0 192.168.5.1 0
+
+**S1**
+
+sys 
+sysname S1
+vlan 2
+port E1/0/20 to E1/0/24
+
+vlan 3
+port E1/0/11 to E1/0/19
+int vlan 1
+ip addr 192.168.2.2 24
+int vlan 2
+ip addr 192.168.1.1 24
+int vlan 3
+ip addr 192.168.6.1 24
+
+ospf 
+area 0
+network 192.168.2.0 0.0.0.255
+network 192.168.1.0 0.0.0.255
+
+int vlan 1 
+ospf cost 100
+int vlan 2
+ospf cost 400
+
+qu
+
+qu
+
+ip ttl ena
+ip unreachables ena
+
+ip route-static 192.168.5.0 24 192.168.3.2 pre 10
+ip route-static 192.168.5.0 24 192.168.1.2 pre 20
+
+
+
+**R1**
+
+sys
+sysname R1
+int E0/0
+undo ip addr 
+ip addr 192.168.1.2 24
+int S1/0
+ip addr 192.168.3.2 24
+
+int E0/1
+ip addr 192.168.4.1 24
+
+ospf
+area 0
+network 192.168.1.0 0.0.0.255
+network 192.168.3.0 0.0.0.255
+
+network 192.168.4.0 0.0.0.255
+
+int E0/0
+
+ospf cost 400
+
+int S1/0
+
+ospf cost 100
+
+qu
+qu
+
+ip ttl ena
+ip unreachables ena
+
+ip route-static 192.168.5.0 24 192.168.4.2
+
+ip route-static 192.168.6.0 24 192.168.2.2 pre 10
+ip route-static 192.168.6.0 24 192.168.1.1 pre 20
+
+**R2**
+
+int E0/0
+undo ip addr
+
+ip addr 192.168.2.1 24
+int S1/0
+IP ADDR 192.168.3.1 24
+OSPF
+area 0
+
+network 192.168.3.0 0.0.0.255
+network 192.168.2.0 0.0.0.255
+
+inter E0/0
+
+ospf cost 100
+inter S1/0
+
+ospf cost 100
+
+
+
+qu
+
+qu
+
+ip route-static 192.168.5.0 24 192.168.3.2
+
+ip route-static 192.168.6.0 24 192.168.2.2
+
+ip ttl ena
+ip unreachables ena
+
+**S2**
+
+vlan 2
+port E1/0/20 to E1/0/24
+
+vlan 3
+port E1/0/11 to E1/0/19
+
+int vlan 1
+ip addr 192.168.4.2 24
+int vlan 2
+ip addr 192.168.5.1 24
+
+ip route-static 0.0.0.0 0 192.168.4.1
+
+### 卷11 win
+
+netsh interface ip set addr name="本地连接" static 192.168.6.2 255.255.255.0 192.168.6.1 0
+
+netsh interface ip set addr name="本地连接" static 192.168.5.2 255.255.255.0 192.168.5.1 0
+
+**S1**
+
+sys 
+sysname S1
+vlan 2
+port  E1/0/24
+
+vlan 3
+port  E1/0/13
+
+int vlan 1
+ip addr 192.168.3.2 24
+int vlan 2
+ip addr 192.168.5.1 24
+int vlan 3
+ip addr 192.168.2.2 24
+
+qu
+
+ip route-static 192.168.0.0 24 192.168.2.1 pre 10
+ip route-static 202.112.1.0 24 192.168.2.1 pre 10
+
+ip route-static 192.168.0.0 24 192.168.3.1 pre 60
+ip route-static 202.112.1.0 24 192.168.2.1 pre 60
+
+ip ttl enable
+ip unreachables ena
+
+ip ttl enable
+ip unreachables ena
+
+**R1**
+
+sys
+sysname R1
+int E0/0
+undo ip addr 
+ip addr 192.168.1.1 24
+int S1/0
+ip addr 192.168.0.1 24
+
+int E1/0 
+ip addr 192.168.3.1 24
+int loop 1 
+ip addr 202.112.1.1 24
+
+ospf
+area 0
+network 192.168.1.0 0.0.0.255
+network 192.168.0.0 0.0.0.255
+
+int S1/0
+ospf cost 100
+int E0/0
+ospf cost 500
+
+import-route static
+import-route direct
+
+qu
+
+qu
+
+ip route-static 192.168.5.0 24 192.168.3.2 pre 60
+
+ip route-static 192.168.5.0 24 192.168.0.2 pre 10
+
+ip ttl enable
+ip unreachables ena
+
+**R2**
+
+int E0/0
+undo ip addr
+
+ip addr 192.168.4.1
+int S1/0
+IP ADDR 192.168.0.2 24
+
+int E0/1
+ip addr 192.168.2.1 24
+
+OSPF
+area 0
+
+network 192.168.0.0 0.0.0.255
+network 192.168.4.0 0.0.0.255
+
+int E0/0 
+
+OSPF COST 100
+int s1/0
+
+OSPF COST 100
+
+ip route-static 192.168.5.0 24 192.168.2.2 
+
+qu
+
+qu
+
+ip ttl enable
+ip unreachables ena
+
+import-route static
+import-route direct
+
+**S2**
+
+vlan 2
+port E1/0/24
+vlan 3
+port E1/0/13
+
+int vlan 1
+ip addr 192.168.4.2 24
+int vlan 2
+ip addr 192.168.6.1 24
+int vlan 3
+ip addr 192.168.1.2 24
+
+OSPF
+area 0
+
+network 192.168.1.0 0.0.0.255
+network 192.168.4.0 0.0.0.255
+network 192.168.6.0 0.0.0.255
+
+int vlan 1
+ospf cost 100
+int vlan 3 
+ospf cost 500
+
+qu
+
+qu
+
+ip route-static 202.112.1.0 24 192.168.0.1 pre 10
+
+ip route-static 202.112.1.0 24 192.168.1.1 pre 60
+
+ip ttl enable
+ip unreachables ena
+
+### BGP策略实验
+
+**[R1]**
+
+sys
+sysname R1
+undo int vlan 1
+int E0/0
+undo ip addr 
+int loop 2
+ip addr 6.6.6.6 32
+int loop 1
+ip addr 1.1.1.1 32 
+int E0/0
+ip addr 11.2.1.1 16
+
+bgp 100
+peer 11.2.1.2 as-number 200
+
+network 1.1.1.1 32
+
+address-family ipv4 unicast
+peer 11.2.1.2 enable
+
+network 6.6.6.6 32
+
+**[S1]**
+
+sys
+sysname S1
+undo int vlan 1
+vlan 2
+port E1/0/24
+int vlan 1
+ip addr 11.2.1.2 16 
+
+int vlan 2
+ip addr 11.4.1.1 16
+int loop 1
+ip addr 3.3.3.3 32 
+
+bgp 200
+peer 11.2.1.1 as-number 100
+
+peer 11.4.1.2 as-number 300
+
+
+address-family ipv4 unicast
+peer 11.2.1.1 enable
+peer 11.4.1.2 ena
+
+network 3.3.3.3 32
+
+**[S2]**
+
+sys
+sysname S2
+undo int vlan 1
+vlan 2
+port E1/0/24
+int vlan 1
+ip addr 11.3.1.2 16 
+
+int vlan 2
+ip addr 11.4.1.2 16
+int loop 1
+ip addr 4.4.4.4 32 
+
+bgp 300
+peer 11.4.1.1 as-number 200
+
+peer 11.3.1.1 as-number 400
+
+
+address-family ipv4 unicast
+peer 11.4.1.1 enable
+peer 11.3.1.1 ena
+
+network 4.4.4.4 32
+
+network 5.5.5.5 32
+
+**[R1]**
+
+sys
+sysname R1
+undo int vlan 1
+int E0/0
+undo ip addr 
+int loop 1
+ip addr 2.2.2.232 
+int E0/0
+ip addr 11.3.1.1 16
+
+bgp 400
+peer 11.3.1.2 as-number 300
+
+address-family ipv4 unicast
+peer 11.3.1.2 enable
+
+network 2.2.2.2 32
+
+network 1.1.1.1 32
+
+
+
+##### [书上]
+
+**S1**
+
+ip as-path-acl 1 deny \b300$        
+
+ip as-path-acl 1 permit ^$
+
+ip as-path-acl 1 permit ^400$ 
+
+peer 11.2.11 as-path-acl 1 export  
+
+#### 考试
+
+**S2**
+
+ip as-path-acl 1 deny \b400$        
+
+ip as-path-acl 1 permit ^$
+
+peer 11.4.1.1 as-path-acl 1 export  
+
+**R1**
+
+acl number 2000
+
+rule 0 deny source 1.1.1.1 0.0.0.0
+
+rule 1 permit source 0.0.0.0 255.255.255.255
+
+peer 11.2.1.2 filter-policy 2000 export
+
+
+
+
+
